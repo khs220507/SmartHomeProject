@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Latest Sensor Data</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+</head>
+<body>
+<h1>Latest Sensor Data</h1>
+<p>Temperature: <span th:text="${temperature}"></span></p>
+<p>Humidity: <span th:text="${humidity}"></span></p>
+<p>Time: <span th:text="${time}"></span></p>
+
+</body>
+</html>
