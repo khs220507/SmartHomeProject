@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from pythermalcomfort.models import pmv
 from pythermalcomfort.utilities import v_relative, clo_dynamic
 import requests
-
+from datetime import datetime
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:220507@localhost/sensor'
@@ -24,44 +24,32 @@ class PMVData(db.Model):
     timestamp = db.Column(db.DateTime)
 
 
-@app.route('/latestPMVData', methods=['GET'])
-def calculate_pmv():
-    latest_data = SensorData.query.order_by(SensorData.timestamp.desc()).first()
-    # DB에서 데이터를 불러왔는지 확인
-    if latest_data is not None:
-        # 실내온도 tdb 및 평균 방사온도 tr을 최신 데이터로 설정하여 PMV를 계산
+@app.route('/latest10PMVData', methods=['GET'])
+def get_latest_10_pmv_data():
+    latest_10_sensor_data = SensorData.query.order_by(SensorData.timestamp.desc()).limit(10).all()
+    pmv_data_list = []
 
-        t_db = latest_data.temperature;
-        t_r = latest_data.temperature;
-        relative_humidity = latest_data.humidity;
+    for data in latest_10_sensor_data:
+        t_db = data.temperature
+        t_r = data.temperature
+        relative_humidity = data.humidity
         v = 0.1
         met_rate = 1.
         clo_insulation = 0.5
         v_r = v_relative(v=v, met=met_rate)
         clo_d = clo_dynamic(clo=clo_insulation, met=met_rate)
-        result = pmv(tdb=t_db, tr=t_r, vr=v_r, rh=relative_humidity, met=met_rate, clo=clo_d)
+        pmv_value = pmv(tdb=t_db, tr=t_r, vr=v_r, rh=relative_humidity, met=met_rate, clo=clo_d)
+        pmv_data_list.append({'temperature': data.temperature, 'humidity': data.humidity, 'pmv': pmv_value})
 
+        pmv_data = PMVData(pmv=pmv_value, timestamp=datetime.now())
+        db.session.add(pmv_data)
 
-        new_pmv_data = PMVData(pmv=result, timestamp=latest_data.timestamp)  # 새 PMV 데이터 인스턴스 생성
-        db.session.add(new_pmv_data)  # 세션에 추가
-        db.session.commit()  # 데이터베이스에 커밋
+    db.session.commit()  # 데이터베이스에 커밋
 
-        # 스프링 부트 애플리케이션 URL
-        spring_boot_app_url = "http://172.30.1.2:8080/latestData"
+    spring_boot_app_url = "http://172.30.1.2:8080/latest10PMVData"
+    response = requests.post(spring_boot_app_url, json=pmv_data_list)
 
-        # 스프링 부트 애플리케이션에 PMV 값을 POST 요청으로 보냄
-        response = requests.post(spring_boot_app_url, json={'pmv': result})
-
-        response_data = {
-            'temperature': latest_data.temperature,
-            'humidity': latest_data.humidity,
-            'pmv': result
-        }
-
-        print(response_data)
-        return jsonify(response_data), 200
-    else:
-        return jsonify({'message': 'No sensor data available'}), 404
+    return jsonify(pmv_data_list), 200
 
 
 

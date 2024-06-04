@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,41 +45,40 @@ public class SensorDataController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error occurred while saving data");
         }
     }
+
     @CrossOrigin(origins = "http://localhost:3000")
     @GetMapping("/latestData")
     public ResponseEntity<Object> latestData() {
-        // Get the latest sensor data
-        SensorData latestData = sensorDataService.getLatestData();
+        // Get the latest 10 sensor data
+        List<SensorData> latest10Data = sensorDataService.getLatest10Data();
 
-        if (latestData == null) {
+        if (latest10Data.isEmpty()) {
             // Handle case when no data is available
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No sensor data available");
         }
 
         // Call Python server to get PMV data
-        String pythonServerUrl = "http://localhost:5000/latestPMVData";
-        ResponseEntity<PMVData> responseEntity = new RestTemplate().getForEntity(pythonServerUrl, PMVData.class);
+        String pythonServerUrl = "http://localhost:5000/latest10PMVData";
+        ResponseEntity<PMVData[]> responseEntity = new RestTemplate().getForEntity(pythonServerUrl, PMVData[].class);
 
         if (responseEntity.getStatusCode() == HttpStatus.OK) {
-            PMVData pmvData = responseEntity.getBody();
+            PMVData[] pmvDataArray = responseEntity.getBody();
+            List<PMVData> pmvDataList = Arrays.asList(pmvDataArray);
 
             // Create a response object containing sensor data and PMV, temperature, humidity
             Map<String, Object> responseData = new HashMap<>();
-            responseData.put("latestData", latestData);
-            responseData.put("pmv", pmvData.getPmv());
-            responseData.put("temperature", pmvData.getTemperature());
-            responseData.put("humidity", pmvData.getHumidity());
+            responseData.put("latestData", latest10Data);
+            responseData.put("pmvData", pmvDataList);
 
             System.out.println("Latest Data: " + responseData.get("latestData"));
-            System.out.println("PMV: " + responseData.get("pmv"));
-            System.out.println("Temperature: " + responseData.get("temperature"));
-            System.out.println("Humidity: " + responseData.get("humidity"));
+            System.out.println("PMV Data: " + responseData.get("pmvData"));
 
             return ResponseEntity.status(HttpStatus.OK).body(responseData);
         } else {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error occurred while fetching data");
         }
     }
+
     @PostMapping("/receivePMV")
     public ResponseEntity<String> receivePMV(@RequestBody PMVData pmvData) {
         float pmv = pmvData.getPmv();

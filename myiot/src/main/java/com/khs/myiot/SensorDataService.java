@@ -45,8 +45,8 @@ public class SensorDataService {
     }
 
 
-    public SensorData getLatestData() {
-        return repository.findTopByOrderByIdDesc();
+    public List<SensorData> getLatest10Data() {
+        return repository.findTop10ByOrderByIdDesc();
     }
     // 추가적인 메서드 정의 가능
 }
